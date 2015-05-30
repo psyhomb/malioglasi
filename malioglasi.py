@@ -7,8 +7,8 @@ from bs4 import BeautifulSoup
 from random import randint
 import os
 import re
-#import urllib2
-import requests
+import urllib2
+#import requests
 import smtplib
 
 
@@ -81,12 +81,12 @@ def phoneInfo(url):
 
   random_headers = headers[randint(0,len(headers)-1)]
 
-  r = requests.get(url, headers=random_headers)
-  r.encoding = 'utf-8'
-  html = r.text
+  #r = requests.get(url, headers=random_headers)
+  #r.encoding = 'utf-8'
+  #html = r.text
 
-  #r = urllib2.Request(url, None, random_headers)
-  #html = urllib2.urlopen(r).read()
+  r = urllib2.Request(url, None, random_headers)
+  html = urllib2.urlopen(r).read()
 
   reg = company + r'<br\s/>' + model + r'.*?\d{3}-\d\d-\d\d\s\d\d:\d\d:\d\d'
   match = re.search(reg, html, re.DOTALL)
