@@ -1,0 +1,6 @@
+[Unit]
+Description=Web scraper for mobilnisvet.com
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/malioglasi.py
