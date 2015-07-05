@@ -3,7 +3,7 @@ Crawler for mobilnisvet.com/mobilni-malioglasi
 
 
 #### Configuration file
-# Note: You have to change parameters inside the configuration file before running
+##### Note: You have to change parameters inside the configuration file before running
 ```bash
 cp malioglasi.conf /etc/malioglasi.conf
 ```
