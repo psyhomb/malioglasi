@@ -3,73 +3,44 @@
 # Date: 29.06.2014
 # Description: Search for specific article on the specific web page and send an email if you found something
 
-from bs4 import BeautifulSoup
-from random import randint
 import os
+import sys
 import re
-import urllib2
-#import requests
 import smtplib
+#import urllib2
+import requests
+from bs4 import BeautifulSoup
+from ConfigParser import SafeConfigParser
+from random import randint
 
 
-### Search for specific article
-#company = 'Samsung'
-#model = 'Galaxy K zoom'
-company = 'LG'
-model = 'Nexus 5 16GB'
-#company = 'Apple'
-#model = 'iPhone 5s 16GB'
-#company = 'Samsung'
-#model = 'I8190 S3 mini'
-#company = 'Apple'
-#model = 'iPhone 4'
-#company = 'HTC'
-#model = 'Desire Z'
-#company = 'Samsung'
-#model = 'I9505 Galaxy S4'
-
-### Gmail username and password
-gmail_user = ''
-gmail_pass = ''  # fsd4fsd32$cGFzc3dvcmQK everything after $ sign is base64 encoded password and everything before is just a random string
-
-### Where to send an email notification (RCPT_TO must be a list data type)
-FROM = 'noreply@gmail.com'
-RCPT_TO = ['test@gmail.com'] # RCPT_TO = ['email1@gmail.com', 'email2@yahoo.com', 'email3@outlook.com']
-SUBJECT = 'Mobilnisvet - %s %s' % (company, model)
+### Config file location
+config_filename = '/etc/malioglasi.conf'
 
 ### Web page url
 url = 'http://www.mobilnisvet.com/mobilni-malioglasi'
 
-### Where to save results (absolute path)
-filename = '/tmp/malioglasi.txt'
 
-
-def sendmail(text):
+def sendmail(text, username, password, sender, recipient, subject):
   """ Mail sender """
-  global gmail_user
-  global gmail_pass
-  global FROM
-  global RCPT_TO
-  global SUBJECT
-
   MESSAGE = text
 
-  message = 'From: %s\nTo: %s\nSubject: %s\n\n%s' % (FROM, ', '.join(RCPT_TO), SUBJECT, MESSAGE)
+  message = 'From: %s\nTo: %s\nSubject: %s\n\n%s' % (sender, ', '.join(recipient), subject, MESSAGE)
 
   try:
     server = smtplib.SMTP('smtp.gmail.com', 587)
     server.ehlo()
     server.starttls()
-    #server.login(gmail_user, gmail_pass)
-    server.login(gmail_user, gmail_pass[gmail_pass.find('$')+1:].decode('base64'))
-    server.sendmail(FROM, RCPT_TO, message)
+    #server.login(username, password)
+    server.login(username, password[password.find('$')+1:].decode('base64'))
+    server.sendmail(sender, recipient, message)
     server.close()
     print 'Mail successfully sent!'
   except:
     print 'Failed to send mail!'
 
 
-def phoneInfo(url):
+def phoneInfo(url, company, model):
   """ Return a dictionary with phone properties """
   headers = [
     {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"},
@@ -81,18 +52,18 @@ def phoneInfo(url):
 
   random_headers = headers[randint(0,len(headers)-1)]
 
-  #r = requests.get(url, headers=random_headers)
-  #r.encoding = 'utf-8'
-  #html = r.text
+  r = requests.get(url, headers=random_headers)
+  r.encoding = 'utf-8'
+  html = r.text
 
-  r = urllib2.Request(url, None, random_headers)
-  html = urllib2.urlopen(r).read()
+  #r = urllib2.Request(url, None, random_headers)
+  #html = urllib2.urlopen(r).read()
 
   reg = company + r'<br\s/>' + model + r'.*?\d{3}-\d\d-\d\d\s\d\d:\d\d:\d\d'
   match = re.search(reg, html, re.DOTALL)
 
   if match:
-    soup = BeautifulSoup(match.group())
+    soup = BeautifulSoup(match.group(), "lxml")
     text = soup.get_text()
 
     list = [ e  for e in text.split('\n')  if e ]
@@ -117,11 +88,24 @@ def phoneInfo(url):
     return d
 
 
+def readConfig(config_filename, section):
+  """ Parse config file and return tuple """
+  parser = SafeConfigParser()
+  parser.read(config_filename)
+
+  d = {}
+  for k,v in parser.items(section):
+    d[k] = v
+
+  return d
+
+
 def writeToFile(filename, text):
   """ Write new data to file """
   try:
     with open(filename, 'w') as f:
       f.write(text)
+    print 'Data are stored in the local file %s' % filename
   except IOError:
     print 'Error while writing to file'
 
@@ -138,26 +122,55 @@ def readFromFile(filename):
 
 
 def main():
-  d = phoneInfo(url)
+  if not os.path.isfile(config_filename):
+    print 'Cannot find configuration file ' + config_filename
+    sys.exit(1)
 
-  text = ''
-  for k,v in sorted(d.items()):
-    text += k + ': ' + v + '\n'
+  email = readConfig(config_filename, 'Email')
+  search = readConfig(config_filename, 'Search')
 
-  text = text.encode('utf-8')
+  username = email['username']
+  password = email['password']
+  sender = email['sender']
+  recipient = email['recipient'].split()
 
-  if os.path.isfile(filename):
-    new_id = d['7-ID']
-    old_id = readFromFile(filename)[-2][6:]
-    if new_id != old_id:
-      print 'Id %s has changed to %s, sending email about this...' % (old_id, new_id)
-      sendmail(text)
-      writeToFile(filename, text)
-    else:
-      print 'Same id %s nothing to do' % (new_id)
+  if email['enabled'] == 'yes':
+    notify = True
   else:
-    sendmail(text)
-    writeToFile(filename, text)
+    notify = False
+
+  # Go through every 'model' and 'name' from configuration file
+  for m,n in search.items():
+    filename = '/tmp/mobilnisvet-%s.txt' % m
+
+    company = n.split()[0]
+    model = ' '.join(n.split()[1:])
+    subject = 'Mobilnisvet - %s %s' % (company, model)
+
+    d = phoneInfo(url, company, model)
+
+    if not d:
+      print 'Cannot find model %s %s' % (company, model)
+      continue
+
+    text = ''
+    for k,v in sorted(d.items()):
+      text += k + ': ' + v + '\n'
+
+    text = text.encode('utf-8')
+
+    if os.path.isfile(filename):
+      new_id = d['7-ID']
+      old_id = readFromFile(filename)[-2][6:]
+      if new_id != old_id:
+        print 'Id %s has changed to %s (%s)' % (old_id, new_id, filename)
+        writeToFile(filename, text)
+        if notify: sendmail(text, username, password, sender, recipient, subject)
+      else:
+        print 'Same id %s nothing to do (%s)' % (new_id,filename)
+    else:
+      writeToFile(filename, text)
+      if notify: sendmail(text, username, password, sender, recipient, subject)
 
 
 if __name__ == '__main__':
