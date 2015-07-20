@@ -89,7 +89,7 @@ def phoneInfo(url, company, model):
 
 
 def readConfig(config_filename, section):
-  """ Parse config file and return tuple """
+  """ Parse config file and return dictionary """
   parser = SafeConfigParser()
   parser.read(config_filename)
 
