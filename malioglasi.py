@@ -37,7 +37,7 @@ def sendmail(text, username, password, sender, recipient, subject):
     server.close()
     print 'Mail successfully sent!'
   except:
-    print 'Failed to send mail!'
+    print 'Failed to send an email!'
 
 
 def phoneInfo(url, company, model):
@@ -133,11 +133,7 @@ def main():
   password = email['password']
   sender = email['sender']
   recipient = email['recipient'].split()
-
-  if email['enabled'] == 'yes':
-    notify = True
-  else:
-    notify = False
+  keywords = email['keywords'].split()
 
   # Go through every 'model' and 'name' from configuration file
   for m,n in search.items():
@@ -158,6 +154,19 @@ def main():
       text += k + ': ' + v + '\n'
 
     text = text.encode('utf-8')
+
+    # Check if there is any unwanted word in the text
+    count = 0
+    for word in keywords:
+      if re.search(word, text, re.IGNORECASE):
+        count = 1
+        break
+
+    # Enable notification if email is enabled and there is none unwanted keywords
+    if email['enabled'] == 'yes' and count == 0:
+      notify = True
+    else:
+      notify = False
 
     if os.path.isfile(filename):
       new_id = d['7-ID']
