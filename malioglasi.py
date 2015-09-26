@@ -6,6 +6,7 @@
 import os
 import sys
 import re
+import json
 import smtplib
 #import urllib2
 import requests
@@ -19,6 +20,9 @@ config_filename = '/etc/malioglasi.conf'
 
 ### Web page url
 url = 'http://www.mobilnisvet.com/mobilni-malioglasi'
+
+### JSON with all entries
+filename = '/tmp/mobilnisvet.json'
 
 
 def sendmail(text, username, password, sender, recipient, subject):
@@ -104,19 +108,17 @@ def writeToFile(filename, text):
   """ Write new data to file """
   try:
     with open(filename, 'w') as f:
-      f.write(text)
+      f.write(json.dumps(text, indent=4, ensure_ascii=False, sort_keys=True).encode('utf-8'))
     print 'Data are stored in the local file %s' % filename
   except IOError:
     print 'Error while writing to file'
 
 
 def readFromFile(filename):
-  """ Read old data from file and return a list """
+  """ Read old data from file and return a dictionary """
   try:
     with open(filename, 'r') as f:
-      properties_string = f.read()
-      properties_list = properties_string.split('\n')
-      return properties_list
+      return json.load(f)
   except IOError:
     print 'Error while reading from file'
 
@@ -135,9 +137,14 @@ def main():
   recipient = email['recipient'].split()
   keywords = email['keywords'].split()
 
+  if os.path.isfile(filename):
+    d_final = readFromFile(filename)
+    new_entry = False
+  else:
+    d_final = {}
+
   # Go through every 'model' and 'name' from configuration file
   for m,n in search.items():
-    filename = '/tmp/mobilnisvet-%s.txt' % m
 
     company = n.split()[0]
     model = ' '.join(n.split()[1:])
@@ -155,7 +162,7 @@ def main():
 
     text = text.encode('utf-8')
 
-    # Check if there is any unwanted word in the text
+    # Check if there is any unwanted keywords in the text
     count = 0
     for word in keywords:
       if re.search(word, text, re.IGNORECASE):
@@ -168,19 +175,23 @@ def main():
     else:
       notify = False
 
-    if os.path.isfile(filename):
+    if d_final and m in d_final:
       new_id = d['7-ID']
-      old_id = readFromFile(filename)[-2][6:]
+      old_id = d_final[m]['7-ID']
       if new_id != old_id:
-        print 'Id %s has changed to %s (%s)' % (old_id, new_id, filename)
-        writeToFile(filename, text)
+        print 'Id %s has changed to %s' % (old_id, new_id)
+        new_entry = True
+        d_final[m] = d
         if notify: sendmail(text, username, password, sender, recipient, subject)
       else:
-        print 'Same id %s nothing to do (%s)' % (new_id,filename)
+        print 'Same id %s nothing to do' % (new_id)
     else:
-      writeToFile(filename, text)
+      new_entry = True
+      d_final[m] = d
       if notify: sendmail(text, username, password, sender, recipient, subject)
 
+  if new_entry:
+    writeToFile(filename, d_final)
 
 if __name__ == '__main__':
   main()
