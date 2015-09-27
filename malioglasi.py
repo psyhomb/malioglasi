@@ -133,7 +133,7 @@ def readFromFile(filename):
 
 def main():
   if not os.path.isfile(config_filename):
-    print 'Cannot find configuration file ' + config_filename
+    print 'Could not find configuration file ' + config_filename
     sys.exit(1)
 
   email = readConfig(config_filename, 'Email')
