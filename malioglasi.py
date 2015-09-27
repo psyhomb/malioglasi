@@ -104,12 +104,20 @@ def readConfig(config_filename, section):
   return d
 
 
+def keywordMatch(text, keywords=[]):
+  """ Check if keywords are included in the text """
+  for keyword in keywords:
+    if re.search(keyword, text, re.IGNORECASE):
+      return True
+  return False
+
+
 def writeToFile(filename, text):
   """ Write new data to file """
   try:
     with open(filename, 'w') as f:
       f.write(json.dumps(text, indent=4, ensure_ascii=False, sort_keys=True).encode('utf-8'))
-    print 'Data are stored in the local file %s' % filename
+    print 'Datastore %s has been updated' % filename
   except IOError:
     print 'Error while writing to file'
 
@@ -129,17 +137,26 @@ def main():
     sys.exit(1)
 
   email = readConfig(config_filename, 'Email')
+  filters = readConfig(config_filename, 'Filters')
   search = readConfig(config_filename, 'Search')
 
   username = email['username']
   password = email['password']
   sender = email['sender']
   recipient = email['recipient'].split()
-  keywords = email['keywords'].split()
+
+  bkw = filters['blacklisted_keywords'].split()
+  #wkw = filters['whitelisted_keywords'].split()
 
   if os.path.isfile(filename):
+    updated = False
     d_final = readFromFile(filename)
-    new_entry = False
+
+    # Remove stale keys from datastore if there is any
+    for k in d_final.keys():
+      if k not in search.keys():
+        del d_final[k]
+        updated = True
   else:
     d_final = {}
 
@@ -162,15 +179,12 @@ def main():
 
     text = text.encode('utf-8')
 
-    # Check if there is any unwanted keywords in the text
-    count = 0
-    for word in keywords:
-      if re.search(word, text, re.IGNORECASE):
-        count = 1
-        break
+    # Check if there is any unwanted (blacklisted) keywords in the text
+    if keywordMatch(text, bkw):
+      continue
 
     # Enable notification if email is enabled and there is none unwanted keywords
-    if email['enabled'] == 'yes' and count == 0:
+    if email['enabled'] == 'yes':
       notify = True
     else:
       notify = False
@@ -180,17 +194,17 @@ def main():
       old_id = d_final[m]['7-ID']
       if new_id != old_id:
         print 'Id %s has changed to %s' % (old_id, new_id)
-        new_entry = True
+        updated = True
         d_final[m] = d
         if notify: sendmail(text, username, password, sender, recipient, subject)
       else:
         print 'Same id %s nothing to do' % (new_id)
     else:
-      new_entry = True
+      updated = True
       d_final[m] = d
       if notify: sendmail(text, username, password, sender, recipient, subject)
 
-  if new_entry:
+  if updated:
     writeToFile(filename, d_final)
 
 if __name__ == '__main__':
