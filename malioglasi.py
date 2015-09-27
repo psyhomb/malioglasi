@@ -146,7 +146,7 @@ def main():
   recipient = email['recipient'].split()
 
   bkw = filters['blacklisted_keywords'].split()
-  #wkw = filters['whitelisted_keywords'].split()
+  wkw = filters['whitelisted_keywords'].split()
 
   if os.path.isfile(filename):
     updated = False
@@ -179,8 +179,12 @@ def main():
 
     text = text.encode('utf-8')
 
-    # Check if there is any unwanted (blacklisted) keywords in the text
-    if keywordMatch(text, bkw):
+    # Check if there is any blacklisted or whitelisted keywords in the text
+    if filters['black_enabled'] == 'yes' and filters['white_enabled'] == 'no' and keywordMatch(text, bkw):
+      continue
+    elif filters['white_enabled'] == 'yes' and filters['black_enabled'] == 'no' and not keywordMatch(text, wkw):
+      continue
+    elif filters['black_enabled'] == 'yes' and filters['white_enabled'] == 'yes' and keywordMatch(text, bkw):
       continue
 
     # Enable notification if email is enabled and there is none unwanted keywords
