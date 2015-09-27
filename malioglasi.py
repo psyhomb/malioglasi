@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 -tt
+#!/usr/bin/python2 -tt
 # Author: Milos Buncic
 # Date: 29.06.2014
 # Description: Search for specific article on the specific web page and send an email if you found something
@@ -21,7 +21,7 @@ config_filename = '/etc/malioglasi.conf'
 ### Web page url
 url = 'http://www.mobilnisvet.com/mobilni-malioglasi'
 
-### JSON with all entries
+### Datastore file
 filename = '/tmp/mobilnisvet.json'
 
 
@@ -163,14 +163,14 @@ def main():
   # Go through every 'model' and 'name' from configuration file
   for m,n in search.items():
 
-    company = n.split()[0]
-    model = ' '.join(n.split()[1:])
+    company = n.split('-')[0].strip()
+    model = n.split('-')[1].strip()
     subject = 'Mobilnisvet - %s %s' % (company, model)
 
     d = phoneInfo(url, company, model)
 
     if not d:
-      print 'Cannot find model %s %s' % (company, model)
+      print 'Could not find model %s %s' % (company, model)
       continue
 
     text = ''
