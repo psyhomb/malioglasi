@@ -148,8 +148,8 @@ def main():
   bkw = filters['blacklisted_keywords'].split()
   wkw = filters['whitelisted_keywords'].split()
 
+  updated = False
   if os.path.isfile(filename):
-    updated = False
     d_final = readFromFile(filename)
 
     # Remove stale keys from datastore if there is any
