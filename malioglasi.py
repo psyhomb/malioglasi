@@ -8,8 +8,8 @@ import sys
 import re
 import json
 import smtplib
-#import urllib2
 import requests
+from telegram import Bot
 from bs4 import BeautifulSoup
 from ConfigParser import SafeConfigParser
 from random import randint
@@ -22,7 +22,7 @@ config_filename = '/etc/malioglasi.conf'
 url = 'http://www.mobilnisvet.com/mobilni-malioglasi'
 
 ### Datastore file
-filename = '/tmp/mobilnisvet.json'
+filename = '/var/tmp/mobilnisvet.json'
 
 
 def sendmail(text, username, password, sender, recipient, subject):
@@ -39,19 +39,31 @@ def sendmail(text, username, password, sender, recipient, subject):
     server.login(username, password[password.find('$')+1:].decode('base64'))
     server.sendmail(sender, recipient, message)
     server.close()
+  except Exception as e:
+    print 'Failed to send an email: %s' % e
+  else:
     print 'Mail successfully sent!'
-  except:
-    print 'Failed to send an email!'
+
+
+def sendtelegram(token, chat_id, message):
+  """ Send message via telegram bot """
+  try:
+    bot = Bot(token=token)
+    bot.send_message(chat_id=chat_id, text=message)
+  except Exception as e:
+    print 'Failed to send telegram message: %s' % e
+  else:
+    print 'Telegram successfully sent!'
 
 
 def phoneInfo(url, company, model):
   """ Return a dictionary with phone properties """
   headers = [
+    {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"},
     {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"},
     {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.1 Safari/537.36"},
     {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.75.14 (KHTML, like Gecko) Version/7.0.3 Safari/7046A194A"},
-    {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20130401 Firefox/31.0"},
-    {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.0 Safari/537.36"}
+    {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20130401 Firefox/31.0"}
   ]
 
   random_headers = headers[randint(0,len(headers)-1)]
@@ -59,9 +71,6 @@ def phoneInfo(url, company, model):
   r = requests.get(url, headers=random_headers)
   r.encoding = 'utf-8'
   html = r.text
-
-  #r = urllib2.Request(url, None, random_headers)
-  #html = urllib2.urlopen(r).read()
 
   reg = company + r'<br\s/>' + model + r'.*?\d{3}-\d\d-\d\d\s\d\d:\d\d:\d\d'
   match = re.search(reg, html, re.DOTALL)
@@ -136,9 +145,13 @@ def main():
     print 'Could not find configuration file ' + config_filename
     sys.exit(1)
 
+  telegram = readConfig(config_filename, 'Telegram')
   email = readConfig(config_filename, 'Email')
   filters = readConfig(config_filename, 'Filters')
   search = readConfig(config_filename, 'Search')
+
+  token = telegram['token']
+  chat_id = telegram['chat_id']
 
   username = email['username']
   password = email['password']
@@ -187,11 +200,14 @@ def main():
     elif filters['black_enabled'] == 'yes' and filters['white_enabled'] == 'yes' and keywordMatch(text, bkw):
       continue
 
-    # Enable notification if email is enabled and there is none unwanted keywords
-    if email['enabled'] == 'yes':
-      notify = True
-    else:
-      notify = False
+    # Enable notification if one of notify methods is enabled and there is none unwanted keywords
+    notify_email = False
+    if email['enabled'] == 'yes' :
+      notify_email = True
+
+    notify_telegram = False
+    if telegram['enabled'] == 'yes':
+      notify_telegram = True
 
     if d_final and m in d_final:
       new_id = d['7-ID']
@@ -200,13 +216,19 @@ def main():
         print 'Id %s has changed to %s' % (old_id, new_id)
         updated = True
         d_final[m] = d
-        if notify: sendmail(text, username, password, sender, recipient, subject)
+        if notify_telegram:
+          sendtelegram(token, chat_id, text)
+        elif notify_email:
+          sendmail(text, username, password, sender, recipient, subject)
       else:
         print 'Same id %s nothing to do' % (new_id)
     else:
       updated = True
       d_final[m] = d
-      if notify: sendmail(text, username, password, sender, recipient, subject)
+      if notify_telegram:
+        sendtelegram(token, chat_id, text)
+      elif notify_email:
+        sendmail(text, username, password, sender, recipient, subject)
 
   if updated:
     writeToFile(filename, d_final)
