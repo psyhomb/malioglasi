@@ -1,0 +1,4 @@
+requests
+configparser
+beautifulsoup4
+python-telegram-bot
