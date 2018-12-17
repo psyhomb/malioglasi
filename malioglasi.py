@@ -82,9 +82,9 @@ def phoneInfo(url, company, model):
     list = [ e  for e in text.split('\n')  if e ]
     del list[:-3]
 
-    price = list[0]
-    text = list[1]
-    phone = list[-1][:list[-1].index('#')]
+    price = list[0].strip()
+    text = list[1].strip()
+    phone = list[-1][:list[-1].index('#')].strip()
     id = list[-1][list[-1].index('#')+1:list[-1].index('|')].strip()
     date = list[-1][list[-1].index('|')+1:].strip()
 
