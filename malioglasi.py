@@ -72,7 +72,7 @@ def phoneInfo(url, company, model):
   r.encoding = 'utf-8'
   html = r.text
 
-  reg = company + r'<br\s/>' + model + r'.*?\d{3}-\d\d-\d\d\s\d\d:\d\d:\d\d'
+  reg = company + r'<br\s/>' + model + r'</strong>.*?\d{3}-\d\d-\d\d\s\d\d:\d\d:\d\d'
   match = re.search(reg, html, re.DOTALL)
 
   if match:
